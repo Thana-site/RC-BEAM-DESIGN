@@ -89,7 +89,8 @@ def build_layer_results_table(
                 "Depth (mm)": round(depth, 1),
                 "Bars": group["bar_count"],
                 "Strain": f"{strain:.5f}",
-                "Stress (MPa)": f"{stress_mpa:.0f}",
+                # FIX 2: Standardized to ksc (Thai engineering standard)
+                "Stress (ksc)": f"{stress_mpa * MPA_TO_KSC:.0f}",
                 "Force (kgf)": f"{force_n * N_TO_KGF:.0f}",
             }
         )
@@ -268,18 +269,21 @@ def create_flexural_plot(
                 )
             )
 
+        # FIX 1: Replaced HTML entities &epsilon; with Unicode ε
+        # FIX 4: Secondary labels use size=10 to reduce crowding in compression zone
         labels.extend(
             [
                 DiagramLabel(
-                    text="&epsilon;c",
+                    text="εc",
                     anchor_x=eps_cu,
                     anchor_y=0.0,
                     priority=100,
                     color=c_col,
                     col=1,
+                    size=10,  # FIX 4: reduced secondary label font size
                     xanchor="left",
                     preferred_xshift=8,
-                    preferred_yshift=-10,
+                    preferred_yshift=-14,  # FIX 4: extra offset to avoid NA overlap
                 ),
                 DiagramLabel(
                     text="NA",
@@ -288,17 +292,19 @@ def create_flexural_plot(
                     priority=100,
                     color=na_col,
                     col=1,
+                    size=10,  # FIX 4: reduced secondary label font size
                     xanchor="left",
-                    preferred_xshift=10,
-                    preferred_yshift=-10,
+                    preferred_xshift=14,  # FIX 4: shifted right to avoid εc overlap
+                    preferred_yshift=0,
                 ),
                 DiagramLabel(
-                    text="&epsilon;t",
+                    text="εt",
                     anchor_x=eps_d,
                     anchor_y=d,
                     priority=90,
                     color=t_col,
                     col=1,
+                    size=10,  # FIX 4: reduced secondary label font size
                     xanchor=strain_side_anchor(eps_d),
                     preferred_xshift=strain_side_shift(eps_d),
                     preferred_yshift=10,
@@ -308,12 +314,13 @@ def create_flexural_plot(
         if dp > 0.0:
             labels.append(
                 DiagramLabel(
-                    text="&epsilon;sc",
+                    text="εsc",
                     anchor_x=eps_dp,
                     anchor_y=dp,
                     priority=80,
                     color=c_col,
                     col=1,
+                    size=10,  # FIX 4: reduced secondary label font size
                     xanchor=strain_side_anchor(eps_dp),
                     preferred_xshift=strain_side_shift(eps_dp),
                     preferred_yshift=-10,
@@ -343,12 +350,14 @@ def create_flexural_plot(
             )
             labels.append(
                 DiagramLabel(
-                    text=f"&epsilon;s,{layer_id(idx)}",
+                    # FIX 1: Replaced HTML entity &epsilon; with Unicode ε
+                    text=f"εs,{layer_id(idx)}",
                     anchor_x=strain,
                     anchor_y=depth,
                     priority=70,
                     color=color,
                     col=1,
+                    size=10,  # FIX 4: reduced secondary label font size
                     xanchor=strain_side_anchor(strain),
                     preferred_xshift=strain_side_shift(strain),
                     preferred_yshift=12 if idx % 2 else -12,
@@ -365,6 +374,7 @@ def create_flexural_plot(
                 fill="toself",
                 fillcolor="rgba(74,222,128,0.22)",
                 line=dict(color=blk_col, width=2),
+                # FIX 5: lowercase with apostrophe — proper engineering notation
                 name=f"0.85f'c = {stress_c_ksc:.0f} ksc",
                 hovertemplate=f"0.85f'c={stress_c_ksc:.0f} ksc<br>a={a:.1f} mm<extra></extra>",
             ),
@@ -382,7 +392,8 @@ def create_flexural_plot(
                 size=10,
                 xanchor="center",
                 preferred_xshift=0,
-                preferred_yshift=0,
+                # FIX 6: added vertical padding to prevent overlap with arrow tip
+                preferred_yshift=8,
             )
         )
 
@@ -396,7 +407,8 @@ def create_flexural_plot(
                 color=c_col,
                 col=2,
                 xanchor="left",
-                preferred_xshift=8,
+                # FIX 6: increased x-padding (8→14px) to clear arrow tip
+                preferred_xshift=14,
                 preferred_yshift=12,
             )
         )
@@ -410,7 +422,8 @@ def create_flexural_plot(
                 color=t_col,
                 col=2,
                 xanchor="left",
-                preferred_xshift=8,
+                # FIX 6: increased x-padding (8→14px) to clear arrow tip
+                preferred_xshift=14,
                 preferred_yshift=12,
             )
         )
@@ -469,12 +482,14 @@ def create_flexural_plot(
 
     ax_opts = dict(showgrid=True, gridcolor="#1e2235", gridwidth=1, tickfont=dict(color="#c8d0e8", size=9), zeroline=False)
     y_range = [h * 1.12, -h * 0.12]
-    eps_range = max([abs(eps_cu), abs(capacity.eps_s), 0.001] + [abs(item) for item in layer_strains]) * 1.45
+    # FIX 3: Lock strain x-axis to fixed ±0.025 range for consistent cross-panel comparison
+    STRAIN_X_RANGE = 0.025
     steel_limit = steel.fy * MPA_TO_KSC * 1.15 if steel is not None else 0.0
     stress_limit = max(stress_c_ksc * 1.8, steel_limit * 1.15, 1.0)
 
+    # FIX 3: Use locked STRAIN_X_RANGE instead of dynamic eps_range for label placer
     strain_layout = SubplotLayout(
-        x_range=(-eps_range, eps_range),
+        x_range=(-STRAIN_X_RANGE, STRAIN_X_RANGE),
         y_range=(y_range[0], y_range[1]),
         width_px=300.0,
         height_px=400.0,
@@ -505,7 +520,8 @@ def create_flexural_plot(
             col=col_idx,
         )
 
-    fig.update_xaxes(range=[-eps_range, eps_range], title_text="strain", title_font=dict(color="#7c8db5", size=8), **ax_opts, row=1, col=1)
+    # FIX 3: All strain panels share the same locked x-axis range [-0.025, +0.025]
+    fig.update_xaxes(range=[-STRAIN_X_RANGE, STRAIN_X_RANGE], title_text="strain", title_font=dict(color="#7c8db5", size=8), **ax_opts, row=1, col=1)
     fig.update_xaxes(range=[-stress_limit, stress_limit], title_text="stress (ksc)", title_font=dict(color="#7c8db5", size=8), **ax_opts, row=1, col=2)
 
     fig.update_layout(

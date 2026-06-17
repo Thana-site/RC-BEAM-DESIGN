@@ -50,8 +50,10 @@ class DiagramLabel:
     visible: bool = True
 
     def plain_text(self) -> str:
+        # FIX 1: Handle Unicode ε (previously &epsilon; HTML entity was replaced)
         return (
-            self.text.replace("&epsilon;", "e")
+            self.text.replace("ε", "e")  # Unicode epsilon → plain 'e' for width estimate
+            .replace("&epsilon;", "e")    # legacy HTML entity fallback
             .replace("<br>", " ")
             .replace("<sup>", "")
             .replace("</sup>", "")

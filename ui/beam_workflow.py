@@ -60,7 +60,8 @@ def render_beam_design_workflow(
 
     st.divider()
     st.markdown('<div class="section-tag">Beam Detailing Elevation</div>', unsafe_allow_html=True)
-    fig = create_beam_elevation_plot(span_lengths, design_results, rebar_summaries)
+    # Pass geom so the elevation uses real beam height, width, and cover
+    fig = create_beam_elevation_plot(span_lengths, design_results, rebar_summaries, geom=geom)
     st.plotly_chart(fig, use_container_width=True, key="beam_elevation")
 
     return design_results, rebar_summaries, span_lengths
@@ -685,10 +686,12 @@ def _render_strain_stress_block(
     st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}_flexural_{sec_key}")
 
     c1, c2, c3, c4 = st.columns(4)
-    _trace_metric(c1, "eps_t", f"{active_capacity.eps_s:.5f}", "", "#f87171")
+    # FIX 1: Use Unicode εt instead of raw 'eps_t' for the strain label
+    _trace_metric(c1, "εt", f"{active_capacity.eps_s:.5f}", "", "#f87171")
     _trace_metric(c2, "c", f"{active_capacity.c_na:.1f}", "mm", "#a78bfa")
     _trace_metric(c3, "a", f"{active_capacity.a:.1f}", "mm", "#60a5fa")
-    _trace_metric(c4, "0.85 f'c", f"{0.85 * concrete.fc_prime:.2f}", "MPa", "#4ade80")
+    # FIX 2 & 5: lowercase label, ksc unit (Thai engineering standard)
+    _trace_metric(c4, "0.85f'c", f"{0.85 * concrete.fc_prime * MPA_TO_KSC:.0f}", "ksc", "#4ade80")
 
     steel_rows = [
         {
@@ -738,7 +741,7 @@ def _render_strain_stress_block(
     concrete_rows = [
         {"Item": "Neutral axis", "Symbol": "c", "Value": f"{active_capacity.c_na:.2f}", "Unit": "mm"},
         {"Item": "Compression block depth", "Symbol": "a = beta1 c", "Value": f"{active_capacity.a:.2f}", "Unit": "mm"},
-        {"Item": "Concrete compression stress", "Symbol": "0.85 f'c", "Value": f"{0.85 * concrete.fc_prime:.2f}", "Unit": "MPa"},
+        {"Item": "Concrete compression stress", "Symbol": "0.85f'c", "Value": f"{0.85 * concrete.fc_prime * MPA_TO_KSC:.0f}", "Unit": "ksc"},
         {"Item": "Concrete compression force", "Symbol": "Cc", "Value": f"{active_capacity.Cc / 9806.65:.2f}", "Unit": "tonf"},
         {"Item": "Compression steel force", "Symbol": "Cs", "Value": f"{active_capacity.Cs / 9806.65:.2f}", "Unit": "tonf"},
         {"Item": "Tension steel force", "Symbol": "Ts", "Value": f"{active_capacity.T / 9806.65:.2f}", "Unit": "tonf"},
