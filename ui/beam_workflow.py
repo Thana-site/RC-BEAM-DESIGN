@@ -133,9 +133,9 @@ def render_calculation_details(
     input_rows = [
         {"Parameter": "b", "Description": "Section width", "Value": f"{geom.b:.2f}", "Unit": "mm"},
         {"Parameter": "h", "Description": "Section depth", "Value": f"{geom.h:.2f}", "Unit": "mm"},
-        {"Parameter": "fc'", "Description": "Concrete compressive strength", "Value": f"{concrete.fc_prime:.2f}", "Unit": "MPa"},
-        {"Parameter": "fy", "Description": "Steel yield strength", "Value": f"{steel.fy:.2f}", "Unit": "MPa"},
-        {"Parameter": "Es", "Description": "Steel modulus", "Value": f"{steel.Es_mpa:.0f}", "Unit": "MPa"},
+        {"Parameter": "f'c", "Description": "Concrete compressive strength", "Value": f"{concrete.fc_ksc:.0f}", "Unit": "ksc"},
+        {"Parameter": "fy", "Description": "Steel yield strength", "Value": f"{steel.fy_ksc:.0f}", "Unit": "ksc"},
+        {"Parameter": "Es", "Description": "Steel modulus", "Value": f"{steel.Es_ksc:.0f}", "Unit": "ksc"},
         {"Parameter": "eps_cu", "Description": "Extreme concrete compression strain", "Value": "0.00300", "Unit": "-"},
         {"Parameter": "beta1", "Description": "Whitney stress block factor", "Value": f"{concrete.beta1:.3f}", "Unit": "-"},
         {"Parameter": "c", "Description": "Neutral axis depth", "Value": f"{capacity.c_na:.2f}", "Unit": "mm"},
@@ -163,16 +163,16 @@ def render_calculation_details(
     st.markdown('<div class="section-tag">3. Steel Stress Calculation</div>', unsafe_allow_html=True)
     stress_rows = []
     for row in layer_rows:
-        fs_raw = steel.Es_mpa * row["strain"]
+        fs_raw_ksc = steel.Es_ksc * row["strain"]
         stress_rows.append(
             {
                 "Layer": row["Layer"],
                 "Bars": row["Bars"],
                 "Formula": "fs = Es x eps_s;  |fs| <= fy",
-                "Substitution": f"fs = {steel.Es_mpa:.0f} x {row['strain']:.5f} = {fs_raw:.1f} MPa",
-                "Limit": f"fy = +/-{steel.fy:.1f} MPa",
-                "Final fs": f"{row['stress_mpa']:.1f}",
-                "Unit": "MPa",
+                "Substitution": f"fs = {steel.Es_ksc:.0f} x {row['strain']:.5f} = {fs_raw_ksc:.0f} ksc",
+                "Limit": f"fy = +/-{steel.fy_ksc:.0f} ksc",
+                "Final fs": f"{row['stress_mpa'] * MPA_TO_KSC:.0f}",
+                "Unit": "ksc",
                 "Status": row["Yield Status"],
             }
         )
@@ -181,26 +181,30 @@ def render_calculation_details(
     st.markdown('<div class="section-tag">4. Steel Force Calculation</div>', unsafe_allow_html=True)
     force_rows = []
     for row in layer_rows:
-        area = row["area_mm2"]
-        displaced = 0.85 * concrete.fc_prime if (row["strain"] > 0.0 and row["depth"] <= a) else 0.0
-        net_stress = row["stress_mpa"] - displaced if displaced else row["stress_mpa"]
+        area_mm2 = row["area_mm2"]
+        area_cm2 = area_mm2 / 100.0
+        displaced_ksc = 0.85 * concrete.fc_ksc if (row["strain"] > 0.0 and row["depth"] <= a) else 0.0
+        stress_ksc = row["stress_mpa"] * MPA_TO_KSC
+        net_stress_ksc = stress_ksc - displaced_ksc
+        force_kgf = area_cm2 * net_stress_ksc
         force_rows.append(
             {
                 "Layer": row["Layer"],
                 "Bars": row["Bars"],
-                "As": f"{area:.1f}",
+                "As (cm²)": f"{area_cm2:.2f}",
                 "Formula": "Fs = As x fs_net",
-                "Substitution": f"Fs = {area:.1f} x ({row['stress_mpa']:.1f} - {displaced:.1f})",
-                "Result": f"{row['force_n']:.0f}",
-                "Force": f"{row['force_n'] / 9806.65:.2f}",
-                "Unit": "N / tonf",
-                "Note": "Concrete displaced" if displaced else "Steel only",
+                "Substitution": f"Fs = {area_cm2:.2f} x ({stress_ksc:.0f} - {displaced_ksc:.0f})",
+                "Result (kgf)": f"{force_kgf:.0f}",
+                "Force (tonf)": f"{force_kgf / 1000.0:.2f}",
+                "Unit": "kgf / tonf",
+                "Note": "Concrete displaced" if displaced_ksc > 0.0 else "Steel only",
             }
         )
     st.dataframe(pd.DataFrame(force_rows), use_container_width=True, hide_index=True, height=min(380, 80 + 36 * max(len(force_rows), 1)))
 
     st.markdown('<div class="section-tag">5. Concrete Compression Block</div>', unsafe_allow_html=True)
-    stress_block = 0.85 * concrete.fc_prime
+    stress_block_ksc = 0.85 * concrete.fc_ksc
+    cc_force_kgf = stress_block_ksc * (geom.b / 10.0) * (min(a, geom.h) / 10.0)
     concrete_rows = [
         {
             "Step": "Stress block depth",
@@ -212,16 +216,16 @@ def render_calculation_details(
         {
             "Step": "Stress block intensity",
             "Formula": "0.85 fc'",
-            "Substitution": f"0.85 x {concrete.fc_prime:.2f}",
-            "Result": f"{stress_block:.2f}",
-            "Unit": "MPa",
+            "Substitution": f"0.85 x {concrete.fc_ksc:.0f}",
+            "Result": f"{stress_block_ksc:.0f}",
+            "Unit": "ksc",
         },
         {
             "Step": "Concrete compression force",
             "Formula": "Cc = 0.85 fc' x b x a",
-            "Substitution": f"Cc = 0.85 x {concrete.fc_prime:.2f} x {geom.b:.2f} x {min(a, geom.h):.2f}",
-            "Result": f"{cc_force_n:.0f} N = {cc_force_n / 9806.65:.2f} tonf",
-            "Unit": "N / tonf",
+            "Substitution": f"Cc = 0.85 x {concrete.fc_ksc:.0f} ksc x {geom.b/10.0:.1f} cm x {min(a, geom.h)/10.0:.1f} cm",
+            "Result": f"{cc_force_kgf:.0f} kgf = {cc_force_kgf / 1000.0:.2f} tonf",
+            "Unit": "kgf / tonf",
         },
         {
             "Step": "Concrete force location",
@@ -332,9 +336,12 @@ def _render_span_panel(
 
     with st.expander("Material and design forces", expanded=False):
         st.markdown('<div class="section-tag">Forces</div>', unsafe_allow_html=True)
+        show_mpa_val = display_opts.get("show_mpa", False)
+        fc_mpa_str = f" ({concrete.fc_prime:.1f} MPa)" if show_mpa_val else ""
+        fy_mpa_str = f" ({steel.fy:.0f} MPa)" if show_mpa_val else ""
         st.markdown(
-            f'<div class="info-box"><b>f&apos;c</b> = {concrete.fc_ksc:.0f} ksc ({concrete.fc_prime:.1f} MPa)<br>'
-            f'<b>fy</b> = {steel.fy_ksc:.0f} ksc ({steel.fy:.0f} MPa)</div>',
+            f'<div class="info-box"><b>f&apos;c</b> = {concrete.fc_ksc:.0f} ksc{fc_mpa_str}<br>'
+            f'<b>fy</b> = {steel.fy_ksc:.0f} ksc{fy_mpa_str}</div>',
             unsafe_allow_html=True,
         )
         defaults = DEFAULT_FORCES[sec_key]
@@ -1194,14 +1201,14 @@ def _formula_assumptions(variable_name: str) -> str:
         return "Solved iteratively using the same flexural capacity model."
     if variable_name == "provided_tensile_reinforcement":
         return "Bar areas are taken from the current reinforcement table."
-    return "ACI stress-block behavior, eps_cu = 0.003, Es = 200000 MPa."
+    return "ACI stress-block behavior, eps_cu = 0.003, Es = 2,040,000 ksc (200,000 MPa)."
 
 
 def _notation_library() -> list[dict]:
     return [
-        {"Symbol": "fc_prime", "Description": "Specified concrete compressive strength", "Unit": "MPa", "Reference": "ACI 318-19 Sec. 19.2"},
-        {"Symbol": "fy", "Description": "Yield strength of longitudinal reinforcement", "Unit": "MPa", "Reference": "ACI 318-19 Sec. 20.2"},
-        {"Symbol": "fyt", "Description": "Yield strength of shear reinforcement", "Unit": "MPa", "Reference": "ACI 318-19 Sec. 20.2"},
+        {"Symbol": "fc_prime", "Description": "Specified concrete compressive strength", "Unit": "ksc", "Reference": "ACI 318-19 Sec. 19.2"},
+        {"Symbol": "fy", "Description": "Yield strength of longitudinal reinforcement", "Unit": "ksc", "Reference": "ACI 318-19 Sec. 20.2"},
+        {"Symbol": "fyt", "Description": "Yield strength of shear reinforcement", "Unit": "ksc", "Reference": "ACI 318-19 Sec. 20.2"},
         {"Symbol": "b", "Description": "Beam width", "Unit": "mm", "Reference": "Project geometry input"},
         {"Symbol": "h", "Description": "Overall beam depth", "Unit": "mm", "Reference": "Project geometry input"},
         {"Symbol": "d", "Description": "Effective depth to tension reinforcement", "Unit": "mm", "Reference": "ACI 318-19 notation"},
@@ -1305,7 +1312,7 @@ def _build_report_text(
         "",
         "## 1. Input Summary",
         f"- Code basis: ACI 318-19 with project detailing inputs.",
-        f"- Units: ksc, MPa, mm, tonf, tonf-m; internal strength calculations use N and mm.",
+        f"- Units: ksc, mm, kgf, tonf, tonf-m; internal strength calculations use N and mm.",
         f"- Section: rectangular beam, b = {geom.b:.0f} mm, h = {geom.h:.0f} mm.",
         f"- Cover = {geom.cover:.0f} mm; stirrup diameter = {geom.stirrup_dia:.0f} mm.",
         "",
@@ -1317,10 +1324,10 @@ def _build_report_text(
         [
             "",
             "## 3. Material Properties",
-            f"- Concrete f'c = {concrete.fc_ksc:.0f} ksc = {concrete.fc_prime:.2f} MPa.",
-            f"- Longitudinal steel fy = {steel.fy_ksc:.0f} ksc = {steel.fy:.2f} MPa.",
-            f"- Stirrup steel fyt = {steel.fyt_ksc:.0f} ksc = {steel.fyt:.2f} MPa.",
-            f"- Es = {steel.Es_mpa:.0f} MPa.",
+            f"- Concrete f'c = {concrete.fc_ksc:.0f} ksc" + (f" = {concrete.fc_prime:.2f} MPa" if st.session_state.get("show_mpa", False) else "") + ".",
+            f"- Longitudinal steel fy = {steel.fy_ksc:.0f} ksc" + (f" = {steel.fy:.2f} MPa" if st.session_state.get("show_mpa", False) else "") + ".",
+            f"- Stirrup steel fyt = {steel.fyt_ksc:.0f} ksc" + (f" = {steel.fyt:.2f} MPa" if st.session_state.get("show_mpa", False) else "") + ".",
+            f"- Es = {steel.Es_ksc:.0f} ksc" + (f" = {steel.Es_mpa:.0f} MPa" if st.session_state.get("show_mpa", False) else "") + ".",
             f"- beta1 = {concrete.beta1:.3f}.",
             "",
             "## 4. Design Loads",

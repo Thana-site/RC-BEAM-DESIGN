@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-MIN_H_SPACING_PX = 20
-MIN_V_SPACING_PX = 15
+MIN_H_SPACING_PX = 25
+MIN_V_SPACING_PX = 18
 
 
 @dataclass
@@ -48,6 +48,7 @@ class DiagramLabel:
     ay: int = 0
     showarrow: bool = False
     visible: bool = True
+    always_show_arrow: bool = False
 
     def plain_text(self) -> str:
         # FIX 1: Handle Unicode ε (previously &epsilon; HTML entity was replaced)
@@ -121,6 +122,16 @@ class LabelPlacer:
         return candidates
 
     def place(self, label: DiagramLabel) -> DiagramLabel:
+        if label.always_show_arrow:
+            label.showarrow = True
+            label.ax = label.preferred_xshift
+            label.ay = label.preferred_yshift
+            label.xshift = 0
+            label.yshift = 0
+            label.visible = True
+            self._placed.append((self._text_bbox_px(label), label.priority))
+            return label
+
         for x_off, y_off, use_arrow in self._candidate_offsets(label):
             label.showarrow = use_arrow
             if use_arrow:

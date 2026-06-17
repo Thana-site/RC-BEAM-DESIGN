@@ -52,3 +52,9 @@ class SteelProps:
     def fyt(self) -> float:
         """Stirrup steel yield strength in MPa."""
         return self.fyt_ksc * KSC_TO_MPA
+
+    @property
+    def Es_ksc(self) -> float:
+        """Modulus of elasticity of steel in ksc."""
+        return self.Es_mpa * MPA_TO_KSC
+

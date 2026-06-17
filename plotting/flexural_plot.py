@@ -132,7 +132,8 @@ def create_flexural_plot(
     layer_groups = _grouped_layers(records, h, pos_moment)
     layer_strains: list[float] = []
     labels: list[DiagramLabel] = []
-    eps_range = max(abs(eps_cu), abs(capacity.eps_s), 0.001) * 1.45
+    # FIX 3: Lock eps_range to a fixed 0.025 for x-axis scale visual fairness
+    eps_range = 0.025
 
     def layer_id(index: int) -> str:
         return f"L{index}"
@@ -146,11 +147,6 @@ def create_flexural_plot(
     if c_na > 0.0:
         eps_d = _signed_strain_at(d, c_na, eps_cu)
         eps_dp = _signed_strain_at(dp, c_na, eps_cu)
-        preview_layer_strains = [_signed_strain_at(group["depth"], c_na, eps_cu) for group in layer_groups]
-        eps_range = max(
-            [abs(eps_cu), abs(capacity.eps_s), abs(eps_d), abs(eps_dp), 0.001]
-            + [abs(item) for item in preview_layer_strains]
-        ) * 1.45
         c_zone = max(0.0, min(c_na, h))
 
         if c_zone > 0.0:
@@ -283,7 +279,7 @@ def create_flexural_plot(
                     size=10,  # FIX 4: reduced secondary label font size
                     xanchor="left",
                     preferred_xshift=8,
-                    preferred_yshift=-14,  # FIX 4: extra offset to avoid NA overlap
+                    preferred_yshift=14,  # FIX 4: shifted UP to avoid compression zone overlap
                 ),
                 DiagramLabel(
                     text="NA",
@@ -391,9 +387,10 @@ def create_flexural_plot(
                 col=2,
                 size=10,
                 xanchor="center",
+                # FIX 6: added vertical padding offset (ay=-25px) between arrow tip and label
                 preferred_xshift=0,
-                # FIX 6: added vertical padding to prevent overlap with arrow tip
-                preferred_yshift=8,
+                preferred_yshift=-25,
+                always_show_arrow=True,
             )
         )
 
@@ -407,9 +404,10 @@ def create_flexural_plot(
                 color=c_col,
                 col=2,
                 xanchor="left",
-                # FIX 6: increased x-padding (8→14px) to clear arrow tip
-                preferred_xshift=14,
-                preferred_yshift=12,
+                # FIX 6: added padding offset (ax=20px, ay=-15px) to clear arrow tip
+                preferred_xshift=20,
+                preferred_yshift=-15,
+                always_show_arrow=True,
             )
         )
     if len(layer_groups) > 0 and d > 0.0 and capacity.T != 0.0:
@@ -422,9 +420,10 @@ def create_flexural_plot(
                 color=t_col,
                 col=2,
                 xanchor="left",
-                # FIX 6: increased x-padding (8→14px) to clear arrow tip
-                preferred_xshift=14,
-                preferred_yshift=12,
+                # FIX 6: added padding offset (ax=20px, ay=15px) to clear arrow tip
+                preferred_xshift=20,
+                preferred_yshift=15,
+                always_show_arrow=True,
             )
         )
 
@@ -455,9 +454,8 @@ def create_flexural_plot(
                         f"{layer_id(idx)} ({group['bar_count']} bars)<br>"
                         f"{'<br>'.join(group['descriptions'])}<br>"
                         "strain=%{customdata[0]:.5f}<br>"
-                        "stress=%{customdata[2]:.0f} MPa<br>"
+                        "stress=%{x:.0f} ksc<br>"
                         "force=%{customdata[3]:.0f} kgf<br>"
-                        "fs=%{x:.0f} ksc<br>"
                         "Fs=%{customdata[1]:.2f} tonf<extra></extra>"
                     ),
                 ),

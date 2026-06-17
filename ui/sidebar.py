@@ -22,6 +22,7 @@ def render_sidebar() -> tuple[SectionGeometry, ConcreteProps, SteelProps, dict]:
     Returns (SectionGeometry, ConcreteProps, SteelProps, display_options).
     """
     with st.sidebar:
+        show_mpa = st.session_state.get("show_mpa", False)
         # ── Section Geometry ──────────────────────────────────────────────
         st.markdown(
             '<div class="sidebar-section-title"><span class="icon">📐</span> Section Geometry</div>',
@@ -77,10 +78,11 @@ def render_sidebar() -> tuple[SectionGeometry, ConcreteProps, SteelProps, dict]:
         else:
             fyt_ksc = STEEL_GRADES[grade_stirrup]
             _fyt_mpa = fyt_ksc * KSC_TO_MPA
+            mpa_pill = f"<span class='unit-pill mpa'>{_fyt_mpa:.0f} MPa</span>" if show_mpa else ""
             _st2.markdown(
                 f"<div style='margin-top:24px'>"
                 f"<span class='unit-pill ksc'>{fyt_ksc} ksc</span>"
-                f"<span class='unit-pill mpa'>{_fyt_mpa:.0f} MPa</span>"
+                f"{mpa_pill}"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -114,10 +116,11 @@ def render_sidebar() -> tuple[SectionGeometry, ConcreteProps, SteelProps, dict]:
         else:
             fc_ksc = CONCRETE_GRADES[grade_fc]
             _fc_mpa = fc_ksc * KSC_TO_MPA
+            mpa_pill = f"<span class='unit-pill mpa'>{_fc_mpa:.1f} MPa</span>" if show_mpa else ""
             _cg2.markdown(
                 f"<div style='margin-top:24px'>"
                 f"<span class='unit-pill ksc'>{fc_ksc} ksc</span>"
-                f"<span class='unit-pill mpa'>{_fc_mpa:.1f} MPa</span>"
+                f"{mpa_pill}"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -138,10 +141,11 @@ def render_sidebar() -> tuple[SectionGeometry, ConcreteProps, SteelProps, dict]:
         else:
             fy_ksc = STEEL_GRADES[grade_fy]
             _fy_mpa = fy_ksc * KSC_TO_MPA
+            mpa_pill = f"<span class='unit-pill mpa'>{_fy_mpa:.0f} MPa</span>" if show_mpa else ""
             _sg2.markdown(
                 f"<div style='margin-top:24px'>"
                 f"<span class='unit-pill ksc'>{fy_ksc} ksc</span>"
-                f"<span class='unit-pill mpa'>{_fy_mpa:.0f} MPa</span>"
+                f"{mpa_pill}"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -164,6 +168,7 @@ def render_sidebar() -> tuple[SectionGeometry, ConcreteProps, SteelProps, dict]:
         show_na        = _d1.checkbox("Neutral Axis", False)
         show_cover_box = _d2.checkbox("Cover Box",    True)
         dark_mode      = st.checkbox("Light Background", False)
+        show_mpa_widget = st.checkbox("Show MPa Equivalents", key="show_mpa")
 
     # Instantiate Models
     geom = SectionGeometry(
@@ -185,7 +190,8 @@ def render_sidebar() -> tuple[SectionGeometry, ConcreteProps, SteelProps, dict]:
         "show_centroid": show_centroid,
         "show_na": show_na,
         "show_cover_box": show_cover_box,
-        "dark_mode": dark_mode
+        "dark_mode": dark_mode,
+        "show_mpa": show_mpa_widget,
     }
     
     return geom, concrete, steel, display_opts

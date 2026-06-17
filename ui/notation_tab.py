@@ -16,6 +16,7 @@ def render_notation_tab(geom: SectionGeometry, concrete: ConcreteProps, steel: S
     """
     Render notations, parameter summary table, and variable reference table.
     """
+    show_mpa = st.session_state.get("show_mpa", False)
     nt1, nt2, nt3 = st.tabs(["📖  Notation & Symbols", "📋  Parameter Summary", "💻  Variable Reference"])
 
     # ── Tab 1: Notation & Symbols ─────────────────────────────────────────────
@@ -101,13 +102,18 @@ def render_notation_tab(geom: SectionGeometry, concrete: ConcreteProps, steel: S
 
         # Materials
         rows.append(("f'c", "Input", f"{concrete.fc_ksc:.0f}", "ksc"))
-        rows.append(("f'c", "Derived", f"{concrete.fc_prime:.2f}", "MPa"))
+        if show_mpa:
+            rows.append(("f'c", "Derived", f"{concrete.fc_prime:.2f}", "MPa"))
         rows.append(("fy  (main steel)", "Input", f"{steel.fy_ksc:.0f}", "ksc"))
-        rows.append(("fy  (main steel)", "Derived", f"{steel.fy:.2f}", "MPa"))
+        if show_mpa:
+            rows.append(("fy  (main steel)", "Derived", f"{steel.fy:.2f}", "MPa"))
         rows.append(("fyt (stirrup)", "Input", f"{steel.fyt_ksc:.0f}", "ksc"))
-        rows.append(("fyt (stirrup)", "Derived", f"{steel.fyt:.2f}", "MPa"))
-        rows.append(("Es", "Constant", "200 000", "MPa"))
-        rows.append(("Ec", "Derived", f"{concrete.Ec_mpa:.0f}", "MPa"))
+        if show_mpa:
+            rows.append(("fyt (stirrup)", "Derived", f"{steel.fyt:.2f}", "MPa"))
+        rows.append(("Es", "Constant", f"{steel.Es_ksc:.0f}", "ksc"))
+        if show_mpa:
+            rows.append(("Es", "Constant", f"{steel.Es_mpa:.0f}", "MPa"))
+            rows.append(("Ec", "Derived", f"{concrete.Ec_mpa:.0f}", "MPa"))
         rows.append(("Ec", "Derived", f"{concrete.Ec_ksc:.0f}", "ksc"))
         rows.append(("n = Es/Ec", "Derived", f"{(steel.Es_mpa/concrete.Ec_mpa):.2f}", "—"))
         rows.append(("β₁", "Derived", f"{concrete.beta1:.3f}", "—"))
@@ -205,11 +211,11 @@ def render_notation_tab(geom: SectionGeometry, concrete: ConcreteProps, steel: S
 
             + _vsec("Material Strengths — global scalars")
             + _vrow("fc_ksc", f"{concrete.fc_ksc:.0f}", "Concrete f'c input", "ksc", "#4ade80")
-            + _vrow("fc_prime", f"{concrete.fc_prime:.2f}", "Concrete f'c converted", "MPa", "#4ade80")
+            + (_vrow("fc_prime", f"{concrete.fc_prime:.2f}", "Concrete f'c converted", "MPa", "#4ade80") if show_mpa else "")
             + _vrow("fy_ksc", f"{steel.fy_ksc:.0f}", "Main steel fy input", "ksc", "#f87171")
-            + _vrow("fy", f"{steel.fy:.2f}", "Main steel fy converted", "MPa", "#f87171")
+            + (_vrow("fy", f"{steel.fy:.2f}", "Main steel fy converted", "MPa", "#f87171") if show_mpa else "")
             + _vrow("fyt_ksc", f"{steel.fyt_ksc:.0f}", "Stirrup fyt input", "ksc", "#fb923c")
-            + _vrow("fyt", f"{steel.fyt:.2f}", "Stirrup fyt converted", "MPa", "#fb923c")
+            + (_vrow("fyt", f"{steel.fyt:.2f}", "Stirrup fyt converted", "MPa", "#fb923c") if show_mpa else "")
 
             + _vsec("Per-Section Steel Areas — pre-computed, ready to use")
             + _vrow("st.session_state['d_bot_Int']",
@@ -258,9 +264,10 @@ def render_notation_tab(geom: SectionGeometry, concrete: ConcreteProps, steel: S
             + _vrow("bar_area(dia)", "π·dia²/4", "Returns cross-section area of one bar in mm²", "mm²", "#a78bfa")
 
             + _vsec("Derived Constants — recompute in Tab 2/3 as needed")
-            + _vrow("Ec = 4700*np.sqrt(fc_prime)", f"{concrete.Ec_mpa:.0f}", "Modulus of elasticity of concrete (ACI 318)", "MPa")
-            + _vrow("n  = 200_000 / Ec", f"{(steel.Es_mpa/concrete.Ec_mpa):.2f}", "Modular ratio Es/Ec", "—")
-            + _vrow("beta1 = max(0.65, 0.85-0.05*(fc_prime-28)/7)", f"{concrete.beta1:.3f}", "ACI 318 stress-block factor β₁", "—")
+            + _vrow("Ec_ksc", f"{concrete.Ec_ksc:.0f}", "Modulus of elasticity of concrete", "ksc")
+            + (_vrow("Ec = 4700*np.sqrt(fc_prime)", f"{concrete.Ec_mpa:.0f}", "Modulus of elasticity of concrete (ACI 318)", "MPa") if show_mpa else "")
+            + _vrow("n  = Es/Ec", f"{(steel.Es_mpa/concrete.Ec_mpa):.2f}", "Modular ratio Es/Ec", "—")
+            + _vrow("beta1", f"{concrete.beta1:.3f}", "ACI 318 stress-block factor β₁", "—")
             + "</tbody></table>"
         )
         st.markdown(rows_html, unsafe_allow_html=True)
